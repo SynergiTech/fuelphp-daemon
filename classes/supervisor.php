@@ -8,6 +8,7 @@ class Supervisor
     private $virtual = true;
     private $pidFile = false;
     private $running = false;
+    private $supervisor = null;
 
     public function __construct($daemon)
     {
@@ -23,6 +24,7 @@ class Supervisor
         $this->log('Starting supervisor ...');
         if ($this->daemon->daemonize()) {
             $this->log('Daemonizing supervisor ...');
+            \Database_Connection::instance()->disconnect();
             $fork = pcntl_fork();
 
             if ($fork === -1) {
@@ -37,26 +39,92 @@ class Supervisor
         $this->virtual = false;
         $this->running = true;
         $this->writePID();
+        $this->registerSignalHandlers();
+        $this->createSupervisor();
 
         $this->log("success", "Successfully started the supervisor");
 
         $this->workers = $workers;
         while ($this->running) {
             // check signals
-            $this->daemon->signal();
+            $this->heartbeat();
+            $this->signal();
+            if (!$this->running) {
+                break;
+            }
 
             $this->checkWorkers();
-
             sleep(1);
         }
 
         $this->deletePID();
+        $this->deleteSupervisor();
+        $this->log("Supervisor exited");
+        exit;
     }
+
+    public function createSupervisor()
+    {
+        $this->supervisor = new Model\Daemon\Worker();
+        $this->supervisor->name = $this->daemon->getConfig('name');
+        $this->supervisor->type = 'supervisor';
+        $this->supervisor->status = 'started';
+        $this->supervisor->save();
+    }
+
+    public function deleteSupervisor()
+    {
+        if ($this->supervisor !== null) {
+            $this->supervisor->delete();
+        }
+    }
+
+    public function heartbeat()
+    {
+        if (time()-$this->supervisor->last_heartbeat < $this->daemon->getConfig('ttlHeartbeat')) {
+            return true;
+        }
+
+        $this->supervisor = Model\Daemon\Worker::query()
+            ->where('id', $this->supervisor->id)
+            ->from_cache(false)
+            ->get_one();
+
+        if (in_array($this->supervisor->status, ['terminating', 'terminated'])) {
+            $this->stop();
+            return;
+        }
+        $this->supervisor->last_heartbeat = time();
+        $this->supervisor->status = 'running';
+        $this->supervisor->save();
+    }
+
+    public function signal($signal = null)
+    {
+        if ($signal === null) {
+            pcntl_signal_dispatch();
+        } elseif ($signal === SIGTERM or $signal === SIGINT) {
+            $this->log("SIGTERM received");
+            $this->stop();
+        }
+    }
+
+    public function registerSignalHandlers()
+    {
+        $signals = [SIGTERM, SIGINT];
+        foreach ($signals as $signal) {
+            pcntl_signal($signal, array($this, 'signal'));
+        }
+        $this->log("debug", "Installed signal handlers");
+    }
+
 
     public function stop()
     {
         $this->running = false;
 
+        // if it's virtual, send a kill signal to the real one
+        // and kill any workers that may not be virtual and belong to us
         if ($this->virtual) {
             $pid = $this->getPid();
             if ($pid !== false) {
@@ -103,7 +171,7 @@ class Supervisor
 
     public function getPid()
     {
-        if ($this->getPidFile() === false) {
+        if ($this->getPidFile() === false or !file_exists($this->getPidFile())) {
             return false;
         }
 

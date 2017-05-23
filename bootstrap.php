@@ -20,5 +20,5 @@
     'Daemon\\Supervisor'                        => __DIR__.'/classes/supervisor.php',
     'Daemon\\Worker'                        => __DIR__.'/classes/worker.php',
 
-    'Daemon\\Model\\Queue_Worker'            => __DIR__.'/classes/model/queue/worker.php',
+    'Daemon\\Model\\Daemon\\Worker'            => __DIR__.'/classes/model/daemon/worker.php',
 ));

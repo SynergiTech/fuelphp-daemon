@@ -24,6 +24,7 @@ class Daemon
         $this->config['slowSpawn'] = isset($config['slowSpawn']) ? $config['slowSpawn'] : \Config::get('daemon.slowSpawn', 5);
         $this->config['supervisorPidFile'] = isset($config['supervisorPidFile']) ? $config['supervisorPidFile'] : \Config::get('daemon.supervisorPidFile', APPPATH.'/tmp/'.$this->config['name'].'.pid');
         $this->config['workerPidPath'] = isset($config['workerPidPath']) ? $config['workerPidPath'] : \Config::get('daemon.workerPidPath', APPPATH.'/tmp/');
+        $this->config['ttlHeartbeat'] = isset($config['ttlHeartbeat']) ? $config['ttlHeartbeat'] : \Config::get('daemon.ttlHeartbeat', 30);
 
         $this->_log = new Log();
 
@@ -34,12 +35,15 @@ class Daemon
         $this->supervisor = new Supervisor($this);
     }
 
-    public function addWorker($name, $callback, $num=1)
+    public function addWorker($name, $callback, $opts = [])
     {
-        for ($i=0; $i<$num; $i++) {
+        if (!isset($opts['concurrent'])) {
+            $opts['concurrent'] = 1;
+        }
+        for ($i=0; $i<$opts['concurrent']; $i++) {
             $iname = $name.'-'.$i;
 
-            $worker = new Worker($this, $iname, $callback);
+            $worker = new Worker($this, $iname, $callback, $opts);
             $this->workers[$iname] = $worker;
         }
 
@@ -66,7 +70,6 @@ class Daemon
             throw new DaemonException("Daemon cannot be started, already running", 3);
         }
         $this->isVirtual = false;
-        $this->registerSignalHandlers();
         $this->startSupervisor($this->getWorkers());
     }
 
@@ -120,23 +123,6 @@ class Daemon
     public function daemonize()
     {
         return $this->config['daemonize'];
-    }
-
-    public function registerSignalHandlers()
-    {
-        pcntl_signal(SIGTERM, array($this, 'signal'));
-        $this->log("debug", "Installed signal handlers");
-    }
-
-    public function signal($signal = null)
-    {
-        if ($signal === null) {
-            pcntl_signal_dispatch();
-        } elseif ($signal === SIGTERM) {
-            $this->log("SIGTERM received");
-            $this->stop();
-            exit;
-        }
     }
 
     public function getConfig($opt = null, $default = null)

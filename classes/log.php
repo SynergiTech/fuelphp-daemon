@@ -6,10 +6,14 @@ class Log
 {
     private $colors;
     private $styles = [
-        'warn' => ['red'],
+        'error' => ['red'],
+        'warn' => ['yellow'],
         'success' => ['green'],
     ];
-    private $name = 'boot';
+    private $name = 'app';
+    private $transports = [
+        'fuel', 'console'
+    ];
 
     public function __construct()
     {
@@ -40,11 +44,22 @@ class Log
             }
         }
 
-        echo $string;
+        foreach ($this->transports as $transport) {
+            if ($transport == 'console') {
+                echo $string;
+            } elseif ($transport == 'fuel') {
+                \Log::info($string);
+            }
+        }
     }
 
     public function setName($name)
     {
         $this->name = $name;
+    }
+
+    public function getColors()
+    {
+        return $this->colors;
     }
 }

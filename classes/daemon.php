@@ -2,58 +2,92 @@
 
 namespace Daemon;
 
+class DaemonException extends \RuntimeException
+{
+}
+
 class Daemon
 {
-    private $daemonize;
-    private $respawn;
-    private $workers;
+    private $config;
+    private $workers = [];
     private $_log;
     private $supervisor;
+    private $isVirtual = true;
 
     public function __construct($config = [])
     {
         \Config::load('daemon');
 
-        $this->name = isset($config['name']) ? $config['name'] : \Config::get('daemon.name', \Config::get('application.name', 'Application'));
-        $this->daemonize = isset($config['daemonize']) ? $config['daemonize'] : \Config::get('daemon.daemonize', true);
-        $this->respawn = isset($config['respawn']) ? $config['respawn'] : \Config::get('daemon.respawn', true);
-        $this->workers = isset($config['workers']) ? $config['workers'] : \Config::get('daemon.workers', true);
-        $this->slowSpawn = isset($config['slowSpawn']) ? $config['slowSpawn'] : \Config::get('daemon.slowSpawn', 5);
-        $this->pidFile = isset($config['pidFile']) ? $config['pidFile'] : \Config::get('daemon.pidFile', APPPATH.'/tmp/'.$this->name.'.pid');
+        $this->config['name'] = isset($config['name']) ? $config['name'] : \Config::get('daemon.name', \Config::get('application.name', 'Application'));
+        $this->config['daemonize'] = isset($config['daemonize']) ? $config['daemonize'] : \Config::get('daemon.daemonize', true);
+        $this->config['respawn'] = isset($config['respawn']) ? $config['respawn'] : \Config::get('daemon.respawn', true);
+        $this->config['slowSpawn'] = isset($config['slowSpawn']) ? $config['slowSpawn'] : \Config::get('daemon.slowSpawn', 5);
+        $this->config['supervisorPidFile'] = isset($config['supervisorPidFile']) ? $config['supervisorPidFile'] : \Config::get('daemon.supervisorPidFile', APPPATH.'/tmp/'.$this->config['name'].'.pid');
+        $this->config['workerPidPath'] = isset($config['workerPidPath']) ? $config['workerPidPath'] : \Config::get('daemon.workerPidPath', APPPATH.'/tmp/');
 
         $this->_log = new Log();
 
-        if (!function_exists('pcntl_fork') and $this->daemonize) {
+        if (!function_exists('pcntl_fork') and $this->config['daemonize']) {
             $this->log("warn", "Config set to daemonize but pcntl_fork() is not available!");
-            $this->daemonize = false;
+            $this->config['daemonize'] = false;
         }
+        $this->supervisor = new Supervisor($this);
+    }
+
+    public function addWorker($name, $callback, $num=1)
+    {
+        for ($i=0; $i<$num; $i++) {
+            $iname = $name.'-'.$i;
+
+            $worker = new Worker($this, $iname, $callback);
+            $this->workers[$iname] = $worker;
+        }
+
+        return $this->workers;
+    }
+
+    public function getWorkers()
+    {
+        return $this->workers;
+    }
+
+    public function getWorker($name)
+    {
+        if (isset($this->workers[$name])) {
+            return $this->workers[$name];
+        }
+
+        return null;
     }
 
     public function start()
     {
-        $this->log("Starting supervisor for ".$this->name);
-        $this->startSupervisor();
+        if ($this->isRunning()) {
+            throw new DaemonException("Daemon cannot be started, already running", 3);
+        }
+        $this->isVirtual = false;
+        $this->registerSignalHandlers();
+        $this->startSupervisor($this->getWorkers());
     }
 
     private function startSupervisor()
     {
-        $this->supervisor = new Supervisor($this);
         $this->supervisor->start();
     }
 
     public function stop()
     {
         if (!$this->isRunning()) {
-            $this->log("warn", "Could not stop daemon: not running");
+            $this->log("warn", "Could not stop: daemon not running");
             return false;
         }
 
-        $this->log("Stopping daemon...");
-        if ($this->killSupervisor()) {
-            $this->log("Successfully stopped daemon");
+        $this->log("Stopping...");
+        if ($this->supervisor->stop()) {
+            $this->log("Successfully stopped");
             return true;
         } else {
-            $this->log("warn", "Could not stop daemon: stop unsuccessful");
+            $this->log("warn", "Could not stop: stop unsuccessful");
             return false;
         }
     }
@@ -80,15 +114,78 @@ class Daemon
 
     public function isRunning()
     {
-        return true;
-    }
-
-    public function killSupervisor()
-    {
+        return $this->supervisor->isRunning();
     }
 
     public function daemonize()
     {
-        return $this->daemonize;
+        return $this->config['daemonize'];
+    }
+
+    public function registerSignalHandlers()
+    {
+        pcntl_signal(SIGTERM, array($this, 'signal'));
+        $this->log("debug", "Installed signal handlers");
+    }
+
+    public function signal($signal = null)
+    {
+        if ($signal === null) {
+            pcntl_signal_dispatch();
+        } elseif ($signal === SIGTERM) {
+            $this->log("SIGTERM received");
+            $this->stop();
+            exit;
+        }
+    }
+
+    public function getConfig($opt = null, $default = null)
+    {
+        if ($opt !== null) {
+            if (isset($this->config[$opt])) {
+                return $this->config[$opt];
+            } else {
+                return $default;
+            }
+        } else {
+            return $this->config;
+        }
+    }
+
+    public function getStatus()
+    {
+        $results = [];
+
+        $results["supervisor"] = ['running' => $this->supervisor->isRunning(), 'pid' => $this->supervisor->getPid()];
+        foreach ($this->workers as $worker) {
+            $results[$worker->getName()] = ['running' => $worker->isRunning(), 'pid' => $worker->getPid()];
+        }
+
+        return $results;
+    }
+
+    public function printStatus()
+    {
+        $status = $this->getStatus();
+        foreach ($status as $name => $info) {
+            $colors = $this->_log->getColors();
+
+            $string = $name.'... '."\t"."\t";
+            if ($info['running']) {
+                $status = $colors->apply('green', 'running');
+                $string .= $status;
+                $string .= " (".$info['pid'].")";
+            } else {
+                $status = $colors->apply('red', 'stopped');
+                $string .= $status;
+            }
+
+            echo $string.PHP_EOL;
+        }
+    }
+
+    public function getSupervisor()
+    {
+        return $this->supervisor;
     }
 }

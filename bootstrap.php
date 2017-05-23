@@ -18,6 +18,7 @@
     'Daemon\\Daemon'                        => __DIR__.'/classes/daemon.php',
     'Daemon\\Log'                        => __DIR__.'/classes/log.php',
     'Daemon\\Supervisor'                        => __DIR__.'/classes/supervisor.php',
+    'Daemon\\Worker'                        => __DIR__.'/classes/worker.php',
 
     'Daemon\\Model\\Queue_Worker'            => __DIR__.'/classes/model/queue/worker.php',
 ));

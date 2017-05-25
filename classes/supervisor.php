@@ -138,12 +138,15 @@ class Supervisor
                     $worker->stop();
                 }
             }
+        }
 
-            foreach ($this->workers as $worker) {
-                while ($worker->isRunning()) {
-                    sleep(1);
-                }
+        foreach ($this->workers as $worker) {
+            while ($worker->isRunning()) {
+                sleep(1);
             }
+        }
+        while ($this->isRunning()) {
+            sleep(1);
         }
 
         return true;
@@ -180,7 +183,6 @@ class Supervisor
 
     public function setVirtual($virtual = true)
     {
-        $this->log("Set virtual to: ".($virtual == true ? 'true' : 'false'));
         $this->virtual = $virtual;
     }
 

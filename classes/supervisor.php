@@ -180,7 +180,13 @@ class Supervisor
 
     public function setVirtual($virtual = true)
     {
+        $this->log("Set virtual to: ".($virtual == true ? 'true' : 'false'));
         $this->virtual = $virtual;
+    }
+
+    public function isVirtual()
+    {
+        return $this->virtual;
     }
 
     public function isRunning()
@@ -217,5 +223,10 @@ class Supervisor
                 break;
             }
         }
+    }
+
+    public function getName()
+    {
+        return 'supervisor';
     }
 }

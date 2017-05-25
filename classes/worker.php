@@ -36,8 +36,8 @@ class Worker
             } elseif ($fork !== 0) {
                 return false;
             } else {
-                $this->daemon->getSupervisor()->setVirtual(true);
                 $this->log()->setName($this->name);
+                $this->daemon->getSupervisor()->setVirtual(true);
                 $this->log("success", "Successfully backgrounded the worker");
             }
         }

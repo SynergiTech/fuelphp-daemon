@@ -64,6 +64,22 @@ class Daemon
         return null;
     }
 
+    public function getChild()
+    {
+        if ($this->isVirtual) {
+            return $this;
+        } elseif (!$this->getSupervisor()->isVirtual()) {
+            return $this->getSupervisor();
+        } else {
+            $workers = $this->getWorkers();
+            foreach ($workers as $worker) {
+                if (!$worker->isVirtual()) {
+                    return $worker;
+                }
+            }
+        }
+    }
+
     public function start()
     {
         if ($this->isRunning()) {

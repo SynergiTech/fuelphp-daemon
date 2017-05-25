@@ -1,16 +1,16 @@
 {
-	"name": "synergitech/daemon",
-	"description" : "FuelPHP 1.x Auth Package",
-	"type": "fuel-package",
-	"homepage": "https://github.com/synergitech/fuelphp-daemon",
-	"license": "MIT",
-	"authors": [
-		{
-			"name": "SynergiTech",
-		}
-	],
-	"require": {
-		"composer/installers": "~1.0",
+    "name": "synergitech/daemon",
+    "description" : "FuelPHP 1.x Auth Package",
+    "type": "fuel-package",
+    "homepage": "https://github.com/synergitech/fuelphp-daemon",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "SynergiTech"
+        }
+    ],
+    "require": {
+        "composer/installers": "~1.0",
         "jakub-onderka/php-console-color": "~0.1"
-	}
+    }
 }

@@ -1,6 +1,6 @@
 {
     "name": "synergitech/daemon",
-    "description" : "FuelPHP 1.x Auth Package",
+    "description" : "FuelPHP package to make running long-lived workers easier",
     "type": "fuel-package",
     "homepage": "https://github.com/synergitech/fuelphp-daemon",
     "license": "MIT",

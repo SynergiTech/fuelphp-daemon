@@ -10,6 +10,7 @@ class Worker
     private $running = false;
     private $daemon;
     private $worker = null;
+    private $opts = [];
 
     public function __construct($daemon, $name, $callback, $opts)
     {
@@ -64,6 +65,9 @@ class Worker
             }
 
             $this->running = call_user_func($this->callback, $this) !== false;
+            if (isset($this->opts['clock']) and is_callable($this->opts['clock'])) {
+                call_user_func($this->opts['clock']);
+            }
         }
 
         $this->stopCallback();

@@ -12,8 +12,6 @@
  * @link       http://fuelphp.com
  */
 
-\Autoloader::add_core_namespace('Daemon');
-
 \Autoloader::add_classes(array(
     'Daemon\\Daemon'                        => __DIR__.'/classes/daemon.php',
     'Daemon\\Log'                        => __DIR__.'/classes/log.php',

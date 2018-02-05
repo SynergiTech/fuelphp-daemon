@@ -22,7 +22,7 @@ class Daemon
         $this->config['workerPidPath'] = isset($config['workerPidPath']) ? $config['workerPidPath'] : \Config::get('daemon.workerPidPath', APPPATH.'/tmp/');
         $this->config['ttlHeartbeat'] = isset($config['ttlHeartbeat']) ? $config['ttlHeartbeat'] : \Config::get('daemon.ttlHeartbeat', 30);
 
-        $this->config['name'] = $this->config['name'] . '-' . uniqid());
+        $this->config['name'] = $this->config['name'] . '-' . uniqid();
 
         $this->worker = new Worker($this, $this->config['name'], $config['callback'], $config);
         $this->log = new Log();

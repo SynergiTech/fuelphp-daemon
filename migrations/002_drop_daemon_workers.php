@@ -2,7 +2,7 @@
 
 namespace Fuel\Migrations;
 
-class Create_daemon_workers
+class Drop_daemon_workers
 {
     public function up()
     {
